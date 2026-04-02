@@ -5,7 +5,9 @@
 
 ## デモ
 
-ブラウザで `index.html` を開くだけで動作します。
+https://sato7f.github.io/sort-visualizer/
+
+ローカルで動かす場合は `index.html` をブラウザで開くだけで動作します。
 
 ## 使い方
 
