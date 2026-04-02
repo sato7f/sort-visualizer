@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ソートアルゴリズム可視化</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+  }
+  .top-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  button {
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #e94560;
+    color: #fff;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  button:hover:not(:disabled) { background: #c73650; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: #0f3460; }
+  button.secondary:hover:not(:disabled) { background: #16213e; }
+  .icon-btn {
+    background: none;
+    border: 1px solid #334;
+    color: #aaa;
+    font-size: 1.3rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    line-height: 1;
+  }
+  .icon-btn:hover:not(:disabled) { color: #e0e0e0; border-color: #556; background: none; }
+  .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .upload-divider {
+    color: #556;
+    font-size: 0.8rem;
+  }
+  .upload-hint {
+    font-size: 0.75rem;
+    color: #667;
+  }
+  .panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    background: #16213e;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .panel.open { display: flex; }
+  .panel-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .panel-row label {
+    font-size: 0.85rem;
+    color: #aaa;
+    white-space: nowrap;
+  }
+  select, input[type=range] {
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  select {
+    background: #0f3460;
+    color: #e0e0e0;
+    border: 1px solid #0f3460;
+  }
+  input[type=range] {
+    width: 100px;
+    accent-color: #e94560;
+    padding: 0;
+  }
+  .upload-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+  }
+  .upload-group input[type=file] { display: none; }
+  .upload-group .file-btn {
+    background: #0f3460;
+    color: #e0e0e0;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+  }
+  .upload-group .file-btn:hover { background: #1a4a8a; }
+  .upload-group .file-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #7aa2d4;
+    font-size: 0.8rem;
+  }
+  .upload-group .clear-btn {
+    background: none;
+    border: none;
+    color: #e94560;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .info-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #aaa;
+  }
+  .info-row span { font-weight: 600; color: #e0e0e0; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+  .canvas-wrapper {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 20px;
+    width: 100%;
+    max-width: 900px;
+  }
+  canvas {
+    width: 100%;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button id="startBtn" class="icon-btn" onclick="start()" title="開始">&#9654;</button>
+  <button id="resetBtn" class="icon-btn" onclick="reset()" title="リセット">&#8634;</button>
+  <button class="icon-btn" onclick="togglePanel()" title="設定">&#9881;</button>
+</div>
+
+<div class="panel" id="panel">
+  <div class="panel-row">
+    <div class="upload-group">
+      <label>動画:</label>
+      <span class="file-btn" onclick="document.getElementById('videoInput').click()">選択</span>
+      <input type="file" id="videoInput" accept="video/*">
+      <span class="file-name" id="videoName">なし</span>
+      <button class="clear-btn" id="videoClear" onclick="clearVideo()" style="display:none">&times;</button>
+    </div>
+    <span class="upload-divider">または</span>
+    <div class="upload-group">
+      <label>画像:</label>
+      <span class="file-btn" onclick="document.getElementById('imageInput').click()">選択</span>
+      <input type="file" id="imageInput" accept="image/*">
+      <span class="file-name" id="imageName">なし</span>
+      <button class="clear-btn" id="imageClear" onclick="clearImage()" style="display:none">&times;</button>
+    </div>
+    <div class="upload-group">
+      <label>音声:</label>
+      <span class="file-btn" onclick="document.getElementById('audioInput').click()">選択</span>
+      <input type="file" id="audioInput" accept="audio/*">
+      <span class="file-name" id="audioName">なし</span>
+      <button class="clear-btn" id="audioClear" onclick="clearAudio()" style="display:none">&times;</button>
+    </div>
+    <span class="upload-hint">音声は1〜2秒程度が推奨</span>
+  </div>
+  <div class="panel-row">
+    <label>アルゴリズム:</label>
+    <select id="algorithm">
+      <option value="bubble">バブルソート</option>
+      <option value="selection">選択ソート</option>
+      <option value="insertion">挿入ソート</option>
+      <option value="quick">クイックソート</option>
+      <option value="merge" selected>マージソート</option>
+      <option value="heap">ヒープソート</option>
+    </select>
+    <label>要素数:</label>
+    <select id="size">
+      <option value="40">40</option>
+      <option value="80">80</option>
+      <option value="120" selected>120</option>
+      <option value="240">240</option>
+      <option value="480">480</option>
+    </select>
+    <label>速度:</label>
+    <input type="range" id="speed" min="1" max="400" value="250">
+    <button id="soundBtn" class="secondary" onclick="toggleSound()" style="padding:6px 10px;font-size:0.8rem">音: ON</button>
+    <button class="secondary" onclick="resetSettings()" style="padding:6px 10px;font-size:0.8rem">設定リセット</button>
+  </div>
+  <div class="info-row">
+    <div>比較: <span id="compCount">0</span></div>
+    <div>交換: <span id="swapCount">0</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#e94560"></div>比較中</div>
+    <div class="legend-item"><div class="legend-color" style="background:#f5c542"></div>交換中</div>
+  </div>
+</div>
+
+<div class="canvas-wrapper">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const COL_DEFAULT = '#53a8e2';
+const COL_COMPARE = '#e94560';
+const COL_SWAP    = '#f5c542';
+
+let arr = [];
+let colors = [];
+let comparisons = 0;
+let swaps = 0;
+let running = false;
+let stopRequested = false;
+let soundEnabled = true;
+let audioCtx = null;
+
+let sourceImage = null;
+let audioBuffer = null;
+
+function togglePanel() {
+  document.getElementById('panel').classList.toggle('open');
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// Persistent oscillator for smooth tone transitions
+let persistentOsc = null;
+let persistentGain = null;
+
+function ensureOscillator() {
+  const ctx = getAudioCtx();
+  if (persistentOsc) return;
+  persistentOsc = ctx.createOscillator();
+  persistentGain = ctx.createGain();
+  persistentOsc.type = 'triangle';
+  persistentOsc.frequency.value = 0;
+  persistentGain.gain.value = 0;
+  persistentOsc.connect(persistentGain);
+  persistentGain.connect(ctx.destination);
+  persistentOsc.start();
+}
+
+function stopOscillator() {
+  if (!persistentOsc) return;
+  persistentOsc.stop();
+  persistentOsc.disconnect();
+  persistentGain.disconnect();
+  persistentOsc = null;
+  persistentGain = null;
+}
+
+function playAudioSegment(value, isSweep) {
+  const ctx = getAudioCtx();
+  const n = arr.length;
+  const segDuration = audioBuffer.duration / n;
+  const offset = (value - 1) * segDuration;
+  // Sweep: play the full segment length for faithful reproduction
+  // Sort: short snippet with fade in/out to avoid clicks
+  const playLen = isSweep ? segDuration * 1.5 : Math.min(segDuration, 0.15);
+  const fade = 0.015; // 15ms fade in/out
+
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  src.buffer = audioBuffer;
+
+  const t = ctx.currentTime;
+  // Fade in
+  gain.gain.setValueAtTime(0.001, t);
+  gain.gain.exponentialRampToValueAtTime(0.3, t + fade);
+  // Fade out
+  const fadeOutStart = t + Math.max(playLen - fade, fade);
+  gain.gain.setValueAtTime(0.3, fadeOutStart);
+  gain.gain.exponentialRampToValueAtTime(0.001, fadeOutStart + fade);
+
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(0, offset, playLen + fade);
+}
+
+function playTone(value) {
+  if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  const n = arr.length;
+
+  if (audioBuffer) {
+    playAudioSegment(value, false);
+  } else {
+    ensureOscillator();
+    const freq = 200 + (value / n) * 1000;
+    const t = ctx.currentTime;
+    persistentOsc.frequency.setTargetAtTime(freq, t, 0.01);
+    persistentGain.gain.setTargetAtTime(0.08, t, 0.005);
+    persistentGain.gain.setTargetAtTime(0, t + 0.06, 0.02);
+  }
+}
+
+// --- Image upload ---
+document.getElementById('imageInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = function() {
+    sourceImage = img;
+    document.getElementById('imageName').textContent = file.name;
+    document.getElementById('imageClear').style.display = '';
+    resizeCanvas();
+    if (!running) { generateArray(); draw(); }
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+function clearImage() {
+  sourceImage = null;
+  document.getElementById('imageInput').value = '';
+  document.getElementById('imageName').textContent = 'なし';
+  document.getElementById('imageClear').style.display = 'none';
+  resizeCanvas();
+  if (!running) draw();
+}
+
+// --- Audio upload ---
+document.getElementById('audioInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ctx = getAudioCtx();
+  const arrayBuf = await file.arrayBuffer();
+  audioBuffer = await ctx.decodeAudioData(arrayBuf);
+  document.getElementById('audioName').textContent = file.name;
+  document.getElementById('audioClear').style.display = '';
+});
+
+function clearAudio() {
+  audioBuffer = null;
+  document.getElementById('audioInput').value = '';
+  document.getElementById('audioName').textContent = 'なし';
+  document.getElementById('audioClear').style.display = 'none';
+}
+
+// --- Video upload (extracts first frame + audio) ---
+document.getElementById('videoInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+
+  // Extract first frame
+  const video = document.createElement('video');
+  video.muted = true;
+  video.preload = 'auto';
+  video.src = url;
+  await new Promise((resolve, reject) => {
+    video.onloadeddata = resolve;
+    video.onerror = reject;
+  });
+  video.currentTime = 0;
+  await new Promise(r => { video.onseeked = r; });
+  const offscreen = document.createElement('canvas');
+  offscreen.width = video.videoWidth;
+  offscreen.height = video.videoHeight;
+  offscreen.getContext('2d').drawImage(video, 0, 0);
+  const img = new Image();
+  img.onload = function() {
+    sourceImage = img;
+    document.getElementById('imageName').textContent = file.name + ' (映像)';
+    document.getElementById('imageClear').style.display = '';
+    resizeCanvas();
+    if (!running) { generateArray(); draw(); }
+  };
+  img.src = offscreen.toDataURL();
+
+  // Extract audio
+  const ctx = getAudioCtx();
+  const arrayBuf = await file.arrayBuffer();
+  try {
+    audioBuffer = await ctx.decodeAudioData(arrayBuf);
+    document.getElementById('audioName').textContent = file.name + ' (音声)';
+    document.getElementById('audioClear').style.display = '';
+  } catch(e) {
+    // Video may have no audio track
+  }
+
+  document.getElementById('videoName').textContent = file.name;
+  document.getElementById('videoClear').style.display = '';
+  URL.revokeObjectURL(url);
+});
+
+function clearVideo() {
+  document.getElementById('videoInput').value = '';
+  document.getElementById('videoName').textContent = 'なし';
+  document.getElementById('videoClear').style.display = 'none';
+  clearImage();
+  clearAudio();
+}
+
+// --- Canvas ---
+const DEFAULT_CANVAS_HEIGHT = 400;
+const MAX_CANVAS_HEIGHT = 700;
+
+function resizeCanvas() {
+  const wrapper = canvas.parentElement;
+  const w = wrapper.clientWidth - 40;
+  canvas.width = w;
+  if (sourceImage) {
+    const ratio = sourceImage.height / sourceImage.width;
+    canvas.height = Math.min(Math.round(w * ratio), MAX_CANVAS_HEIGHT);
+  } else {
+    canvas.height = DEFAULT_CANVAS_HEIGHT;
+  }
+  canvas.style.height = canvas.height + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+
+function getDelay() {
+  const v = document.getElementById('speed').value;
+  return Math.max(0, 200 - v);
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function generateArray() {
+  const n = parseInt(document.getElementById('size').value);
+  arr = [];
+  for (let i = 1; i <= n; i++) arr.push(i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  colors = new Array(arr.length).fill(COL_DEFAULT);
+}
+
+function draw() {
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const n = arr.length;
+  if (sourceImage) {
+    drawImageMode(w, h, n);
+  } else {
+    drawBarMode(w, h, n);
+  }
+}
+
+function drawBarMode(w, h, n) {
+  const barW = w / n;
+  const gap = barW > 4 ? 1 : 0;
+  for (let i = 0; i < n; i++) {
+    const barH = (arr[i] / n) * (h - 10);
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(i * barW + gap, h - barH, barW - gap * 2, barH);
+  }
+}
+
+function drawImageMode(w, h, n) {
+  const img = sourceImage;
+  const stripWsrc = img.width / n;
+  for (let i = 0; i < n; i++) {
+    const srcIdx = arr[i] - 1;
+    const dx = Math.floor(i * w / n);
+    const dw = Math.floor((i + 1) * w / n) - dx;
+    ctx.drawImage(img, srcIdx * stripWsrc, 0, stripWsrc, img.height, dx, 0, dw, h);
+    if (colors[i] !== COL_DEFAULT) {
+      ctx.fillStyle = colors[i];
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(dx, 0, dw, h);
+      ctx.globalAlpha = 1.0;
+    }
+  }
+}
+
+function updateStats() {
+  document.getElementById('compCount').textContent = comparisons;
+  document.getElementById('swapCount').textContent = swaps;
+}
+
+async function markCompare(i, j) {
+  comparisons++;
+  colors[i] = COL_COMPARE;
+  colors[j] = COL_COMPARE;
+  playTone(arr[i]);
+  draw(); updateStats();
+  await sleep(getDelay());
+  colors[i] = COL_DEFAULT;
+  colors[j] = COL_DEFAULT;
+}
+
+async function markSwap(i, j) {
+  swaps++;
+  colors[i] = COL_SWAP;
+  colors[j] = COL_SWAP;
+  draw(); updateStats();
+  await sleep(getDelay());
+  colors[i] = COL_DEFAULT;
+  colors[j] = COL_DEFAULT;
+}
+
+// ---- Sorting Algorithms ----
+
+async function bubbleSort() {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    for (let j = 0; j < n - 1 - i; j++) {
+      if (stopRequested) return;
+      await markCompare(j, j + 1);
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        await markSwap(j, j + 1);
+      }
+    }
+  }
+}
+
+async function selectionSort() {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    let minIdx = i;
+    for (let j = i + 1; j < n; j++) {
+      if (stopRequested) return;
+      await markCompare(minIdx, j);
+      if (arr[j] < arr[minIdx]) minIdx = j;
+    }
+    if (minIdx !== i) {
+      [arr[i], arr[minIdx]] = [arr[minIdx], arr[i]];
+      await markSwap(i, minIdx);
+    }
+  }
+}
+
+async function insertionSort() {
+  const n = arr.length;
+  for (let i = 1; i < n; i++) {
+    let j = i;
+    while (j > 0) {
+      if (stopRequested) return;
+      await markCompare(j - 1, j);
+      if (arr[j - 1] > arr[j]) {
+        [arr[j - 1], arr[j]] = [arr[j], arr[j - 1]];
+        await markSwap(j - 1, j);
+        j--;
+      } else {
+        break;
+      }
+    }
+  }
+}
+
+async function quickSort(lo = 0, hi = arr.length - 1) {
+  if (lo >= hi) return;
+  if (stopRequested) return;
+  const pivot = arr[hi];
+  let i = lo;
+  for (let j = lo; j < hi; j++) {
+    if (stopRequested) return;
+    await markCompare(j, hi);
+    if (arr[j] < pivot) {
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      await markSwap(i, j);
+      i++;
+    }
+  }
+  [arr[i], arr[hi]] = [arr[hi], arr[i]];
+  await markSwap(i, hi);
+  await quickSort(lo, i - 1);
+  await quickSort(i + 1, hi);
+}
+
+async function mergeSort(lo = 0, hi = arr.length - 1) {
+  if (lo >= hi) return;
+  if (stopRequested) return;
+  const mid = Math.floor((lo + hi) / 2);
+  await mergeSort(lo, mid);
+  await mergeSort(mid + 1, hi);
+  if (stopRequested) return;
+  const tmp = [];
+  let i = lo, j = mid + 1;
+  while (i <= mid && j <= hi) {
+    if (stopRequested) return;
+    await markCompare(i, j);
+    if (arr[i] <= arr[j]) { tmp.push(arr[i++]); }
+    else { tmp.push(arr[j++]); swaps++; }
+  }
+  while (i <= mid) tmp.push(arr[i++]);
+  while (j <= hi) tmp.push(arr[j++]);
+  for (let k = lo; k <= hi; k++) {
+    arr[k] = tmp[k - lo];
+    colors[k] = COL_SWAP;
+  }
+  draw(); updateStats();
+  await sleep(getDelay());
+  for (let k = lo; k <= hi; k++) colors[k] = COL_DEFAULT;
+}
+
+async function heapSort() {
+  const n = arr.length;
+
+  async function siftDown(size, i) {
+    let largest = i;
+    const l = 2 * i + 1, r = 2 * i + 2;
+    if (l < size) {
+      if (stopRequested) return;
+      await markCompare(l, largest);
+      if (arr[l] > arr[largest]) largest = l;
+    }
+    if (r < size) {
+      if (stopRequested) return;
+      await markCompare(r, largest);
+      if (arr[r] > arr[largest]) largest = r;
+    }
+    if (largest !== i) {
+      [arr[i], arr[largest]] = [arr[largest], arr[i]];
+      await markSwap(i, largest);
+      await siftDown(size, largest);
+    }
+  }
+
+  for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+    if (stopRequested) return;
+    await siftDown(n, i);
+  }
+  for (let i = n - 1; i > 0; i--) {
+    if (stopRequested) return;
+    [arr[0], arr[i]] = [arr[i], arr[0]];
+    await markSwap(0, i);
+    await siftDown(i, 0);
+  }
+}
+
+// ---- Controls ----
+
+async function start() {
+  if (running) return;
+  running = true;
+  stopRequested = false;
+  document.getElementById('startBtn').disabled = true;
+
+  const algo = document.getElementById('algorithm').value;
+  const sortFn = {
+    bubble: bubbleSort,
+    selection: selectionSort,
+    insertion: insertionSort,
+    quick: quickSort,
+    merge: mergeSort,
+    heap: heapSort,
+  }[algo];
+
+  await sortFn();
+
+  if (!stopRequested) {
+    colors.fill(COL_DEFAULT);
+    draw();
+    await playCompleteSweep();
+  }
+  stopOscillator();
+  running = false;
+  document.getElementById('startBtn').disabled = false;
+}
+
+function reset() {
+  stopRequested = true;
+  stopOscillator();
+  running = false;
+  comparisons = 0;
+  swaps = 0;
+  updateStats();
+  generateArray();
+  draw();
+  document.getElementById('startBtn').disabled = false;
+}
+
+function resetSettings() {
+  document.getElementById('algorithm').value = 'merge';
+  document.getElementById('size').value = '120';
+  document.getElementById('speed').value = '250';
+  soundEnabled = true;
+  document.getElementById('soundBtn').textContent = '音: ON';
+  reset();
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  document.getElementById('soundBtn').textContent = '音: ' + (soundEnabled ? 'ON' : 'OFF');
+}
+
+async function playCompleteSweep() {
+  if (!soundEnabled) return;
+  const n = arr.length;
+  for (let i = 0; i < n; i++) {
+    if (stopRequested) return;
+    if (audioBuffer) {
+      playAudioSegment(arr[i], true);
+    } else {
+      playTone(arr[i]);
+    }
+    colors.fill(COL_DEFAULT);
+    colors[i] = sourceImage ? COL_COMPARE : '#fff';
+    draw();
+    await sleep(Math.max(10, 600 / n));
+  }
+  colors.fill(COL_DEFAULT);
+  draw();
+}
+
+document.getElementById('size').addEventListener('change', () => { reset(); });
+
+// Init
+generateArray();
+draw();
+</script>
+</body>
+</html>
