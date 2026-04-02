@@ -166,8 +166,9 @@
 <body>
 
 <div class="top-bar">
-  <button id="startBtn" class="icon-btn" onclick="start()" title="開始">&#9654;</button>
-  <button id="resetBtn" class="icon-btn" onclick="reset()" title="リセット">&#8634;</button>
+  <button id="startBtn" class="icon-btn" onclick="start()" title="ソート開始">&#9654;</button>
+  <button id="recordBtn" class="icon-btn" onclick="startWithRecord()" title="ソート開始＆録画" style="font-size:0.85rem"><span style="font-size:1.1rem">&#9654;</span><span style="color:#e94560;font-weight:700;margin-left:2px">REC</span></button>
+  <button id="resetBtn" class="icon-btn" onclick="reset()" title="中断/リセット">&#8634;</button>
   <button class="icon-btn" onclick="togglePanel()" title="設定">&#9881;</button>
 </div>
 
@@ -251,6 +252,68 @@ let audioCtx = null;
 let sourceImage = null;
 let audioBuffer = null;
 
+// --- Recording ---
+let mediaRecorder = null;
+let recordedChunks = [];
+let audioDestination = null; // MediaStreamDestination for recording audio
+
+function startRecording() {
+  const ac = getAudioCtx();
+  const canvasStream = canvas.captureStream(30);
+
+  // Capture audio output
+  audioDestination = ac.createMediaStreamDestination();
+  const combined = new MediaStream([
+    ...canvasStream.getTracks(),
+    ...audioDestination.stream.getTracks()
+  ]);
+
+  recordedChunks = [];
+  // Prefer mp4 with aac audio (Windows/Twitter compatible), fallback to webm
+  const candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=h264,opus',
+    'video/webm'
+  ];
+  const mimeType = candidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+  const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+  mediaRecorder = new MediaRecorder(combined, { mimeType });
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    if (confirm('ソート部分の録画を端末に保存しますか？')) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sort-visualizer.' + ext;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    audioDestination = null;
+  };
+  mediaRecorder.start();
+  document.getElementById('recordBtn').style.opacity = '0.4';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  mediaRecorder = null;
+  document.getElementById('recordBtn').style.opacity = '';
+}
+
+async function startWithRecord() {
+  if (running) return;
+  reset();
+  startRecording();
+  await start();
+  stopRecording();
+}
+
 function togglePanel() {
   document.getElementById('panel').classList.toggle('open');
 }
@@ -274,6 +337,7 @@ function ensureOscillator() {
   persistentGain.gain.value = 0;
   persistentOsc.connect(persistentGain);
   persistentGain.connect(ctx.destination);
+  if (audioDestination) persistentGain.connect(audioDestination);
   persistentOsc.start();
 }
 
@@ -311,6 +375,7 @@ function playAudioSegment(value, isSweep) {
 
   src.connect(gain);
   gain.connect(ctx.destination);
+  if (audioDestination) gain.connect(audioDestination);
   src.start(0, offset, playLen + fade);
 }
 
@@ -670,6 +735,7 @@ async function start() {
   running = true;
   stopRequested = false;
   document.getElementById('startBtn').disabled = true;
+  document.getElementById('recordBtn').disabled = true;
 
   const algo = document.getElementById('algorithm').value;
   const sortFn = {
@@ -691,11 +757,13 @@ async function start() {
   stopOscillator();
   running = false;
   document.getElementById('startBtn').disabled = false;
+  document.getElementById('recordBtn').disabled = false;
 }
 
 function reset() {
   stopRequested = true;
   stopOscillator();
+  stopRecording();
   running = false;
   comparisons = 0;
   swaps = 0;
@@ -703,6 +771,7 @@ function reset() {
   generateArray();
   draw();
   document.getElementById('startBtn').disabled = false;
+  document.getElementById('recordBtn').disabled = false;
 }
 
 function resetSettings() {
